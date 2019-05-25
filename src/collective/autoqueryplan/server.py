@@ -37,13 +37,39 @@ def get_plan_path():
 
 
 def dump_pmap(obj, is_key=False):
-    """ can't have sets, classes or complex objects as dict keys in json.  """
+    """
+    Can't have sets, classes or complex objects as dict keys in json.
+
+    Handle complex keys
+    >>> dump_pmap({frozenset([1,2,3]):"blah"})
+    {'{1, 2, 3}': 'blah'}
+
+    >>> dump_pmap({(1,2,3):set(['a'])})
+    {'(1, 2, 3)': "{'a'}"}
+
+    Handles tuples as keys (which json can't)
+    #TODO: it always assumes sets are frozen sets
+    >>> load_pmap(dump_pmap({(1,2,3):set(['a'])}))
+    {(1, 2, 3): frozenset(['a'])}
+
+    Works for lists of sets in (even if not needed for this usecase
+    >>> dump_pmap([1,2,set(['a'])])
+    [1, 2, "{'a'}"]
+
+    >>> load_pmap(dump_pmap([1,2,set(['a'])]))
+    [1, 2, frozenset(['a'])]
+
+    """
     if isinstance(obj, Benchmark):
         return (round(obj[0], 4),) + obj[1:]
     elif isinstance(obj, (frozenset, set)):
         return "{%s}" % str(list(obj))[1:-1]
     elif is_key and isinstance(obj, (list, tuple)):
         return str(obj)
+    elif isinstance(obj, (tuple)):
+        return (dump_pmap(i) for i in obj)
+    elif isinstance(obj, (list)):
+        return [dump_pmap(i) for i in obj]
     elif isinstance(obj, dict):
         return {dump_pmap(key, True): dump_pmap(value) for key, value in obj.items()}
     else:
@@ -60,6 +86,10 @@ def load_pmap(obj):
             return ast.literal_eval(obj)
         else:
             return obj
+    elif isinstance(obj, (tuple)):
+        return (load_pmap(i) for i in obj)
+    elif isinstance(obj, (list)):
+        return [load_pmap(i) for i in obj]
     elif isinstance(obj, dict):
         return {load_pmap(key): load_pmap(value) for key, value in obj.items()}
     else:

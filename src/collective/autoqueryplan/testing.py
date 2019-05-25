@@ -18,36 +18,6 @@ if HAS_REDIS and HAS_MSGPACK:
 
 logger = logging.getLogger('collective.autoqueryplan')
 
-
-def runAsyncTest(testMethod, timeout=100, loop_timeout=0.1, loop_count=1):
-    """Helper method for running tests requiring asyncore loop"""
-    while True:
-        try:
-            asyncore.loop(timeout=loop_timeout, count=loop_count)
-            return testMethod()
-        except AssertionError:
-            if timeout > 0:
-                timeout -= 1
-                continue
-            else:
-                raise
-
-
-class ZServer(z2.ZServer):
-    """Custom ZServer, which can survive when socket_map is modified between
-    different test cases within the same layer"""
-    def runner(self):
-        socket_map = asyncore.socket_map
-        while socket_map and not self._shutdown:
-            try:
-                asyncore.poll(self.timeout, socket_map)
-            except:
-                # Try once more, because the socket_map have been modified:
-                asyncore.poll(self.timeout, socket_map)
-
-ZSERVER_FIXTURE = ZServer()
-
-
 class autoqueryplanServerLayer(Layer):
     defaultBases = (z2.STARTUP,)
 
